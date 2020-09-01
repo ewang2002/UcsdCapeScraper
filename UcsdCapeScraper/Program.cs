@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 using HtmlAgilityPack;
 using Newtonsoft.Json;
@@ -11,7 +12,10 @@ using OpenQA.Selenium.Chrome;
 using OpenQA.Selenium.Support.UI;
 using static UcsdCapeScraper.Constants;
 using UcsdCapeScraper.Definitions;
-using static UcsdCapeScraper.Helpers;
+using static UcsdCapeScraper.Helpers.ConfigHelper;
+using static UcsdCapeScraper.Helpers.ConsoleHelper;
+using static UcsdCapeScraper.Helpers.ParseHelpers;
+using LogType = UcsdCapeScraper.Helpers.LogType;
 
 namespace UcsdCapeScraper
 {
@@ -19,40 +23,92 @@ namespace UcsdCapeScraper
 	{
 		public static async Task Main()
 		{
-			// get inputs
-			Console.WriteLine("[INPUT] Please type your TritonLink username (Or Student PID).");
-			var username = Console.ReadLine()?.Trim() ?? "";
-			Console.WriteLine("[INPUT] Please type your password.");
-			var password = Console.ReadLine()?.Trim() ?? "";
-			Console.Clear();
-			using var driver = new ChromeDriver(@"C:\Users\ewang\Desktop\Selenium Drivers");
+			// determine initial path
+			var execAssembly = Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly();
+			var pathOfExecution = Path.GetDirectoryName(execAssembly.Location);
+			var dirInfo = new DirectoryInfo(pathOfExecution!);
+			var possibleConfigFiles = dirInfo
+				.GetFiles()
+				.Where(x => x.Name.ToLower() == "config.txt")
+				.ToArray();
+			FileInfo configFile;
+
+			if (possibleConfigFiles.Any())
+				configFile = possibleConfigFiles.First();
+			else
+			{
+				LogWithColor(
+					"A config.txt file could not be found. This program cannot continue unless you have this file. Please type the path to this file now.",
+					ConsoleColor.DarkYellow, LogType.Warning);
+				var userSpecifiedPath = Console.ReadLine() ?? string.Empty;
+				if (userSpecifiedPath == string.Empty || !File.Exists(userSpecifiedPath))
+				{
+					LogWithColor("The path you specified was invalid. This program is unable to continue.",
+						ConsoleColor.Red, LogType.Error);
+					return;
+				}
+
+				configFile = new FileInfo(userSpecifiedPath);
+			}
+
+			var parsedConfig = await GetConfiguration(configFile);
+			if (!Directory.Exists(parsedConfig.PathToDrivers))
+			{
+				LogWithColor(
+					"Your PATH_TO_DRIVERS variable is invalid. This variable must point to a folder that has the Chrome Selenium drivers.",
+					ConsoleColor.Red, LogType.Error);
+				return;
+			}
+
+			if (!Directory.Exists(parsedConfig.OutputJsonPath))
+			{
+				LogWithColor(
+					"Your OUTPUT_JSON_LOCATION variable is invalid. This variable must point to a folder where the generated JSON file should be saved.",
+					ConsoleColor.Red, LogType.Error);
+				return;
+			}
+
+			if (parsedConfig.TritonLinkPassword == string.Empty || parsedConfig.TritonLinkUsername == string.Empty)
+			{
+				LogWithColor(
+					"Your TRITONLINK_USERNAME and/or TRITONLINK_PASSWORD variable is invalid. Please make sure both variables have been filled out and then try again.",
+					ConsoleColor.Red, LogType.Error);
+				return;
+			}
+
+			using var driver = new ChromeDriver(parsedConfig.PathToDrivers);
 			driver.Navigate().GoToUrl(CapeUrl);
 
 			Console.Clear();
-			driver.FindElementByName("urn:mace:ucsd.edu:sso:username").SendKeys(username);
-			driver.FindElementByName("urn:mace:ucsd.edu:sso:password").SendKeys(password + Keys.Enter);
+			driver.FindElementByName("urn:mace:ucsd.edu:sso:username").SendKeys(parsedConfig.TritonLinkUsername);
+			driver.FindElementByName("urn:mace:ucsd.edu:sso:password")
+				.SendKeys(parsedConfig.TritonLinkPassword + Keys.Enter);
 
 			if (driver.FindElementsById("_login_error_message").Count != 0)
 			{
-				Console.WriteLine("[ERROR] Your username or password was incorrect. Please restart the program.");
+				LogWithColor(
+					"Your username or password was incorrect. Please check your configuration file and restart the program.",
+					ConsoleColor.Red, LogType.Error);
 				driver.Close();
 				return;
 			}
 
 			try
 			{
-				Console.WriteLine("[INFO] Please authenticate with Duo. You have 1 minute.");
+				LogWithColor("Please authenticate this session with Duo 2FA. You have one minute.", ConsoleColor.Cyan,
+					LogType.Info);
 				var wait = new WebDriverWait(driver, TimeSpan.FromMinutes(1));
 				wait.Until(x => x.Url.Contains(CapeUrl));
 			}
 			catch (Exception)
 			{
-				Console.WriteLine("[ERROR] You did not authenticate with Duo in time. Please restart the program.");
+				LogWithColor("You did not authenticate with Duo 2FA in time. Please restart this program.",
+					ConsoleColor.Red, LogType.Error);
 				driver.Close();
 				return;
 			}
 
-			Console.WriteLine("[INFO] Logged in successfully!");
+			LogWithColor("Logged in successfully.", ConsoleColor.Green, LogType.Info);
 
 			// get all departments
 			var departmentDropDown =
@@ -60,7 +116,7 @@ namespace UcsdCapeScraper
 			var allOptions = departmentDropDown.Options
 				.Skip(1) // remove "select a department" 
 				.ToArray();
-			
+
 			var returnDict = new Dictionary<string, IList<CapeEvalResultsRow>>();
 			var stopwatch = new Stopwatch();
 			stopwatch.Start();
@@ -82,11 +138,13 @@ namespace UcsdCapeScraper
 				}
 				catch (Exception)
 				{
-					Console.WriteLine($"[ERROR] Error getting CAPE data for {option.Text}. Skipping.");
+					LogWithColor($"Error getting CAPE data for {option.Text}. Skipping.", ConsoleColor.DarkYellow,
+						LogType.Warning);
 					continue;
 				}
 
-				Console.WriteLine($"[INFO] CAPE website has been loaded for {option.Text}.");
+				LogWithColor($"CAPE website has been loaded with the department: {option.Text}", ConsoleColor.Cyan,
+					LogType.Info);
 				var departmentId = option.Text.Split('-')[0].Trim();
 				returnDict.Add(departmentId, new List<CapeEvalResultsRow>());
 
@@ -98,7 +156,9 @@ namespace UcsdCapeScraper
 				var outerTable = doc.GetElementbyId("ctl00_ContentPlaceHolder1_gvCAPEs");
 				if (outerTable == null)
 				{
-					Console.WriteLine("[ERROR] A table could not be found. Skipping.");
+					LogWithColor(
+						$"A table could not be found for this department. There is probably no data available. Skipping.",
+						ConsoleColor.DarkYellow, LogType.Warning);
 					continue;
 				}
 
@@ -106,7 +166,8 @@ namespace UcsdCapeScraper
 				var tBodyNodes = outerTable.SelectNodes("tbody");
 				if (tBodyNodes == null || tBodyNodes.Count == 0)
 				{
-					Console.WriteLine("[ERROR] A table was found, but there are no entries available. Skipping.");
+					LogWithColor($"A table was found {option.Text}, but there is no data available. Skipping.",
+						ConsoleColor.DarkYellow, LogType.Warning);
 					continue;
 				}
 
@@ -154,8 +215,10 @@ namespace UcsdCapeScraper
 					});
 				}
 
-				Console.WriteLine($"[INFO] Successfully scraped {returnDict[departmentId].Count} rows.");
+				WriteLineWithColor($"\tSuccessfully scraped {returnDict[departmentId].Count} rows for this department.",
+					ConsoleColor.Green);
 			}
+
 			stopwatch.Stop();
 			Console.WriteLine();
 
@@ -163,26 +226,12 @@ namespace UcsdCapeScraper
 			var json = JsonConvert.SerializeObject(returnDict);
 
 			// we're done parsing
-			// time to figure out a place
-			while (true)
-			{
-				Console.WriteLine("[INFO] Please input the directory where you want to save the data.");
-				var dir = Console.ReadLine()?.Trim() ?? "";
-				if (!Directory.Exists(dir)) 
-					continue;
-				try
-				{
-					await File.WriteAllTextAsync(Path.Join(dir, "out.json"), json);
-					break;
-				}
-				catch (Exception)
-				{
-					Console.WriteLine("[ERROR] Couldn't write to directory. Try again.");
-				}
-			}
+			await File.WriteAllTextAsync(Path.Join(parsedConfig.OutputJsonPath, "out.json"), json);
 
 			Console.WriteLine();
-			Console.WriteLine($"[INFO] Scraping took {stopwatch.Elapsed.Minutes}:{stopwatch.Elapsed.Seconds}.");
+			LogWithColor(
+				$"Scraped {returnDict.Select(x => x.Value.Count).Sum()} rows in {stopwatch.Elapsed.Minutes} Minutes and {stopwatch.Elapsed.Seconds} Seconds.\n\nPress any key to exit.",
+				ConsoleColor.Cyan, LogType.Info);
 			Console.ReadKey();
 		}
 	}

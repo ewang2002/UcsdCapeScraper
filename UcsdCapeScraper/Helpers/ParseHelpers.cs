@@ -1,11 +1,9 @@
-﻿using System;
-using System.Diagnostics.Contracts;
-using System.Linq;
+﻿using System.Linq;
 using System.Net;
 
-namespace UcsdCapeScraper
+namespace UcsdCapeScraper.Helpers
 {
-	public static class Helpers
+	public static class ParseHelpers
 	{
 		/// <summary>
 		/// Parses the GPA input. The GPA input is usually in the form "Letter (GPA)."
