@@ -26,8 +26,7 @@ namespace UcsdCapeScraper
 			// determine initial path
 			var execAssembly = Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly();
 			var pathOfExecution = Path.GetDirectoryName(execAssembly.Location);
-			var dirInfo = new DirectoryInfo(pathOfExecution!);
-			var possibleConfigFiles = dirInfo
+			var possibleConfigFiles = new DirectoryInfo(pathOfExecution!)
 				.GetFiles()
 				.Where(x => x.Name.ToLower() == "config.txt")
 				.ToArray();
