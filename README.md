@@ -22,8 +22,9 @@ You may choose to either run the pre-built (compiled) version of the program or 
 **NOTE**: I have not formally released this project yet. 
 1. Go to the project's [releases page](https://github.com/ewang2002/UcsdCapeScraper/releases).
 2. Download the latest release.
-3. Fill out the `SAMPLE_CONFIG.txt` file and rename it to `config.txt`. 
-4. Run the program directly.
+3. Download the Selenium Driver that best matches your version of Chrome. The download link is above.
+4. Fill out the `SAMPLE_CONFIG.txt` file and rename it to `config.txt`. 
+5. Run the program directly.
 </details>
 
 <details>
