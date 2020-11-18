@@ -69,7 +69,11 @@ if (parsedConfig.TritonLinkPassword == string.Empty || parsedConfig.TritonLinkUs
 	return;
 }
 
-using var driver = new ChromeDriver(parsedConfig.PathToDrivers);
+var chromeOptions = new ChromeOptions();
+chromeOptions.AddArgument("--headless");
+chromeOptions.AddArgument("log-level=1");
+
+using var driver = new ChromeDriver(parsedConfig.PathToDrivers, chromeOptions);
 driver.Navigate().GoToUrl(CapeUrl);
 
 Console.Clear();
@@ -103,6 +107,8 @@ catch (Exception)
 }
 
 LogWithColor("Logged in successfully.", ConsoleColor.Green, LogType.Info);
+
+await Task.Delay(TimeSpan.FromSeconds(3));
 
 // get all departments
 var departmentDropDown =
