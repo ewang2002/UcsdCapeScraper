@@ -30,9 +30,9 @@ namespace UcsdCapeScraper.Helpers
 
 			var logMsg = time.ToString("[HH:mm:ss] ") + type switch
 			{
-				LogType.Error => "[ERROR] ",
-				LogType.Info => "[INFO] ",
-				LogType.Warning => "[WARNING] ",
+				LogType.Error => "[Error] ",
+				LogType.Info => "[Info] ",
+				LogType.Warning => "[Warn] ",
 				_ => throw new ArgumentOutOfRangeException(nameof(type), type, null)
 			} + input;
 

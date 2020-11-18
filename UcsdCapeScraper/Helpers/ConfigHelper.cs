@@ -23,7 +23,7 @@ namespace UcsdCapeScraper.Helpers
 
 			foreach (var line in lines)
 			{
-				if (line.IndexOf('=') == -1)
+				if (!line.Contains('='))
 					continue;
 
 				var propVal = line.Split('=')

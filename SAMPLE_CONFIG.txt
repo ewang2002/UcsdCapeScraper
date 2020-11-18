@@ -11,7 +11,8 @@ TRITONLINK_PASSWORD=
 
 # Selenium Driver path. If this isn't specified,
 # the program will use the directory that this
-# file is in.
+# file is in. Download Chrome drivers here:
+# https://chromedriver.chromium.org/downloads
 PATH_TO_DRIVERS=
 
 # Output JSON Path.
