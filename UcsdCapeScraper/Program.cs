@@ -133,7 +133,7 @@ foreach (var option in allOptions)
 	{
 		var wait = new WebDriverWait(driver, TimeSpan.FromSeconds(30));
 		wait.Until(x =>
-			x.FindElement(By.Id("ctl00_ContentPlaceHolder1_UpdateProgress1")).GetAttribute("style")
+			x.FindElement(By.Id("ContentPlaceHolder1_UpdateProgress1")).GetAttribute("style")
 				.Equals("display: none;"));
 	}
 	catch (Exception)
@@ -153,7 +153,7 @@ foreach (var option in allOptions)
 	doc.LoadHtml(driver.PageSource);
 
 	// get table 
-	var outerTable = doc.GetElementbyId("ctl00_ContentPlaceHolder1_gvCAPEs");
+	var outerTable = doc.GetElementbyId("ContentPlaceHolder1_gvCAPEs");
 	if (outerTable == null)
 	{
 		LogWithColor(
