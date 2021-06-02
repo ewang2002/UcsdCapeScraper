@@ -3,6 +3,9 @@ using System.Net;
 
 namespace UcsdCapeScraper.Helpers
 {
+	/// <summary>
+	/// A series of helper methods that are intended to clean the given input.
+	/// </summary>
 	public static class ParseHelpers
 	{
 		/// <summary>
@@ -14,7 +17,9 @@ namespace UcsdCapeScraper.Helpers
 		{
 			if (IsNotAvailable(input))
 				return -1;
+			
 			var splitLeftParen = input.Split('(');
+			
 			// invalid input
 			if (splitLeftParen.Length != 2)
 				return -1;
@@ -113,12 +118,11 @@ namespace UcsdCapeScraper.Helpers
 				if (!input.Contains($"({character})"))
 					continue;
 
-				input = input
-					.Replace($"({character})", string.Empty);
+				input = input.Replace($"({character})", string.Empty);
 				break;
 			}
 
-			return input;
+			return input.Trim();
 		}
 
 		/// <summary>
