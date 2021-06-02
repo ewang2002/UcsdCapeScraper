@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using HtmlAgilityPack;
@@ -22,6 +23,9 @@ namespace UcsdCapeScraper
 		/// <returns>A dictionary of CAPE data. Key is department; V is list of rows.</returns>
 		public static async Task<Dictionary<string, IList<CapeEvalResultsRow>>> GetAllCapes(ChromeDriver driver)
 		{
+			var stopwatch = new Stopwatch();
+			stopwatch.Start();
+
 			// get all departments
 			var departmentDropDown =
 				new SelectElement(driver.FindElement(By.Name("ctl00$ContentPlaceHolder1$ddlDepartments")));
@@ -122,12 +126,17 @@ namespace UcsdCapeScraper
 					});
 				}
 
-				ConsoleHelper.WriteLine(LogType.Info, $"\tSuccessfully scraped {returnDict[departmentId].Count} rows " +
+				ConsoleHelper.WriteLine(LogType.Info, $"Successfully scraped {returnDict[departmentId].Count} rows " +
 				                                      "for this department.");
 			}
 
 			var rowsScraped = returnDict.Select(x => x.Value.Count).Sum();
-			ConsoleHelper.WriteLine(LogType.Info, $"Scraped {rowsScraped} rows.");
+			Console.WriteLine();
+			stopwatch.Stop();
+			var timeTaken = $"{stopwatch.Elapsed.Minutes} Minutes, " +
+			                $"{stopwatch.Elapsed.Seconds} Seconds, " +
+			                $"{stopwatch.Elapsed.Milliseconds} Milliseconds.";
+			ConsoleHelper.WriteLine(LogType.Info, $"Successfully scraped {rowsScraped} rows. Time taken: {timeTaken}.");
 			return returnDict;
 		}
 	}

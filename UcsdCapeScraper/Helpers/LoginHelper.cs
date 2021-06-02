@@ -9,13 +9,15 @@ namespace UcsdCapeScraper.Helpers
 {
 	public static class LoginHelper
 	{
-		public static async Task<ChromeDriver> Login(string pathToDrivers, string username, string password)
+		/// <summary>
+		/// Logs into WebReg. This will return a driver that can be used.
+		/// </summary>
+		/// <param name="driver">The driver.</param>
+		/// <param name="username">The username.</param>
+		/// <param name="password">The password.</param>
+		/// <returns>The driver.</returns>
+		public static async Task<ChromeDriver> Login(ChromeDriver driver, string username, string password)
 		{
-			var chromeOptions = new ChromeOptions();
-			chromeOptions.AddArgument("--headless");
-			chromeOptions.AddArgument("log-level=3");
-
-			using var driver = new ChromeDriver(pathToDrivers, chromeOptions);
 			driver.Navigate().GoToUrl(CapeUrl);
 
 			Console.Clear();
@@ -47,7 +49,6 @@ namespace UcsdCapeScraper.Helpers
 			}
 
 			ConsoleHelper.WriteLine(LogType.Info, "Logged in successfully.");
-
 			await Task.Delay(TimeSpan.FromSeconds(3));
 			return driver;
 		}
