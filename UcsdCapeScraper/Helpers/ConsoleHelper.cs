@@ -9,7 +9,6 @@ namespace UcsdCapeScraper.Helpers
 		/// </summary>
 		/// <typeparam name="T">The input type.</typeparam>
 		/// <param name="input">The input to be logged.</param>
-		/// <param name="foreground">The color that the output should be.</param>
 		/// <param name="type">The logging type.</param>
 		public static void WriteLine<T>(LogType type, T input)
 		{

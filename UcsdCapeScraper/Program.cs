@@ -2,12 +2,12 @@
 using System.IO;
 using System.Linq;
 using CommandLine;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Serialization;
 using OpenQA.Selenium.Chrome;
 using UcsdCapeScraper;
 using UcsdCapeScraper.Helpers;
 using LogType = UcsdCapeScraper.Helpers.LogType;
+
+const string outFile = "out.tsv";
 
 // Note: For anyone that doesn't like my use of "goto" and labels, know that I felt like this would be
 // the most appropriate way to approach this particular problem. I could use a method to handle exiting
@@ -16,7 +16,7 @@ using LogType = UcsdCapeScraper.Helpers.LogType;
 // Apparently, using a callback results in no exceptions being thrown.
 var res = Parser.Default.ParseArguments<CliArguments>(args);
 var o = (res as Parsed<CliArguments>)?.Value;
-if (o is null) 
+if (o is null)
 	return;
 
 // Make sure the directory exists.
@@ -36,13 +36,13 @@ if (files.All(x => x.Name != "chromedriver.exe"))
 }
 
 // Make sure out.json doesn't exist.
-if (files.Any(x => x.Name == "out.json"))
+if (files.Any(x => x.Name == outFile))
 {
-	ConsoleHelper.WriteLine(LogType.Warning, "You have a duplicate out.json file. Overwrite? y/[n]");
+	ConsoleHelper.WriteLine(LogType.Warning, $"You have a duplicate '{outFile}' file. Overwrite? y/[n]");
 	var ans = Console.ReadLine() ?? "n";
 	if (ans.ToLower().Trim() != "y")
 	{
-		ConsoleHelper.WriteLine(LogType.Error, "Answered yes to question. Please remove out.json and try again.");
+		ConsoleHelper.WriteLine(LogType.Error, $"Answered yes to question. Please remove {outFile} and try again.");
 		goto exit;
 	}
 }
@@ -65,19 +65,19 @@ chromeOptions.AddArgument("log-level=3");
 var driver = new ChromeDriver(o.Directory, chromeOptions);
 await LoginHelper.Login(driver, username, password);
 
-var result = await ProgramRunner.GetAllCapes(driver);
-
-Console.WriteLine();
-
-// save as json
-var json = JsonConvert.SerializeObject(result, new JsonSerializerSettings
+var exists = File.Exists(Path.Join(o.Directory, outFile));
+var file = new StreamWriter(Path.Join(o.Directory, outFile), true);
+if (!exists)
 {
-	ContractResolver = new CamelCasePropertyNamesContractResolver()
-});
+	// CSV file template 
+	await file.WriteLineAsync(
+		"instructor\tsub_course\tcourse\tterm\tenroll\tevals_made\trcmd_class\trcmd_instr\tstudy_hr_wk\tavg_grade_exp\tavg_grade_rec"
+	);
+}
 
-// we're done parsing
-await File.WriteAllTextAsync(Path.Join(o.Directory, "out.json"), json);
+await ProgramRunner.GetAllCapes(driver, file);
 
+file.Close();
 driver.Close();
 driver.Dispose();
 

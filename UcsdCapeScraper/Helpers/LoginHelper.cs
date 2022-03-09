@@ -21,12 +21,12 @@ namespace UcsdCapeScraper.Helpers
 			driver.Navigate().GoToUrl(CapeUrl);
 
 			Console.Clear();
-			driver.FindElementByName("urn:mace:ucsd.edu:sso:username")
+			driver.FindElement(By.Name("urn:mace:ucsd.edu:sso:username"))
 				.SendKeys(username);
-			driver.FindElementByName("urn:mace:ucsd.edu:sso:password")
+			driver.FindElement(By.Name("urn:mace:ucsd.edu:sso:password"))
 				.SendKeys(password + Keys.Enter);
 
-			if (driver.FindElementsById("_login_error_message").Count != 0)
+			if (driver.FindElements(By.Id("_login_error_message")).Count != 0)
 			{
 				ConsoleHelper.WriteLine(LogType.Error, "Your username or password was incorrect.");
 				driver.Close();

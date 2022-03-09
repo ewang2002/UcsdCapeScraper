@@ -1,13 +1,12 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using HtmlAgilityPack;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
 using OpenQA.Selenium.Support.UI;
-using UcsdCapeScraper.Definitions;
 using UcsdCapeScraper.Helpers;
 using static UcsdCapeScraper.Helpers.ParseHelpers;
 using LogType = UcsdCapeScraper.Helpers.LogType;
@@ -20,8 +19,8 @@ namespace UcsdCapeScraper
 		/// Gets all CAPE data.
 		/// </summary>
 		/// <param name="driver">The driver to use.</param>
-		/// <returns>A dictionary of CAPE data. Key is department; V is list of rows.</returns>
-		public static async Task<Dictionary<string, IList<CapeEvalResultsRow>>> GetAllCapes(ChromeDriver driver)
+		/// <param name="writer">The file to write to.</param>
+		public static async Task GetAllCapes(ChromeDriver driver, StreamWriter writer)
 		{
 			var stopwatch = new Stopwatch();
 			stopwatch.Start();
@@ -33,13 +32,13 @@ namespace UcsdCapeScraper
 				.Skip(1) // remove "select a department" 
 				.ToArray();
 
-			var returnDict = new Dictionary<string, IList<CapeEvalResultsRow>>();
+			var totalScraped = 0;
 			// go through each department 
 			foreach (var option in allOptions)
 			{
 				Console.WriteLine();
 				option.Click();
-				driver.FindElementByName("ctl00$ContentPlaceHolder1$btnSubmit").Click();
+				driver.FindElement(By.Name("ctl00$ContentPlaceHolder1$btnSubmit")).Click();
 				// because the website takes that long to change between
 				// the loading and not loading state 
 				await Task.Delay(TimeSpan.FromSeconds(1));
@@ -47,7 +46,8 @@ namespace UcsdCapeScraper
 				{
 					var wait = new WebDriverWait(driver, TimeSpan.FromSeconds(30));
 					wait.Until(x =>
-						x.FindElement(By.Id("ContentPlaceHolder1_UpdateProgress1")).GetAttribute("style")
+						x.FindElement(By.Id("ContentPlaceHolder1_UpdateProgress1"))
+							.GetAttribute("style")
 							.Equals("display: none;"));
 				}
 				catch (Exception)
@@ -56,9 +56,8 @@ namespace UcsdCapeScraper
 					continue;
 				}
 
-				ConsoleHelper.WriteLine(LogType.Info, $"CAPE website has been loaded with the department: {option.Text}");
-				var departmentId = option.Text.Split('-')[0].Trim();
-				returnDict.Add(departmentId, new List<CapeEvalResultsRow>());
+				ConsoleHelper.WriteLine(LogType.Info,
+					$"CAPE website has been loaded with the department: {option.Text}");
 
 				// begin parsing 
 				var doc = new HtmlDocument();
@@ -84,6 +83,7 @@ namespace UcsdCapeScraper
 
 				var rowNodes = tBodyNodes.First().SelectNodes("tr");
 
+				var ct = 0;
 				// go through each row
 				foreach (var row in rowNodes)
 				{
@@ -94,15 +94,15 @@ namespace UcsdCapeScraper
 						.ToArray();
 
 					// basic course info 
-					var courseId = CleanStringInput(courseIdAndName[0]);
+					var subCourse = CleanStringInput(courseIdAndName[0]);
 					var courseName = CleanStringInput(RemoveParenLetter(courseIdAndName[1]));
 					var term = CleanStringInput(cells[2].InnerText);
 					var enrolled = CleanIntString(cells[3].InnerText);
 					var evalsMade = CleanIntString(cells[4].ChildNodes[1].InnerText);
 					// recommended class
-					var remdClass = CleanRecommendationString(cells[5].ChildNodes[1].InnerText);
+					var recmdClass = CleanRecommendationString(cells[5].ChildNodes[1].InnerText);
 					// recommended instructor 
-					var remdInstructor = CleanRecommendationString(cells[6].ChildNodes[1].InnerText);
+					var recmdInstructor = CleanRecommendationString(cells[6].ChildNodes[1].InnerText);
 					// study hours per week
 					var studyHrWk = CleanDecimalString(cells[7].ChildNodes[1].InnerText);
 					// avg gpa that was expected
@@ -110,34 +110,31 @@ namespace UcsdCapeScraper
 					// avg gpa that was received
 					var avgGradeReceived = CleanGpaString(cells[9].ChildNodes[1].InnerText);
 
-					returnDict[departmentId].Add(new CapeEvalResultsRow
-					{
-						Instructor = instructor,
-						AverageGradeExpected = avgGradeExpected,
-						AverageGradeReceived = avgGradeReceived,
-						CourseNumber = courseId,
-						CourseTitle = courseName,
-						Enrolled = enrolled,
-						EvalsMade = evalsMade,
-						RecommendClass = remdClass,
-						RecommendInstructor = remdInstructor,
-						StudyHrsWk = studyHrWk,
-						Term = term
-					});
+					// ReSharper disable once UseStringInterpolation
+					await writer.WriteLineAsync(string.Format("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}\t{10}",
+						instructor,
+						subCourse,
+						courseName,
+						term,
+						enrolled,
+						evalsMade,
+						recmdClass,
+						recmdInstructor,
+						studyHrWk,
+						avgGradeExpected,
+						avgGradeReceived));
+					ct++;
 				}
 
-				ConsoleHelper.WriteLine(LogType.Info, $"Successfully scraped {returnDict[departmentId].Count} rows " +
-				                                      "for this department.");
+				ConsoleHelper.WriteLine(LogType.Info, $"Successfully scraped {ct} rows for this department.");
+				totalScraped += ct;
 			}
 
-			var rowsScraped = returnDict.Select(x => x.Value.Count).Sum();
+			await writer.FlushAsync();
 			Console.WriteLine();
 			stopwatch.Stop();
-			var timeTaken = $"{stopwatch.Elapsed.Minutes} Minutes, " +
-			                $"{stopwatch.Elapsed.Seconds} Seconds, " +
-			                $"{stopwatch.Elapsed.Milliseconds} Milliseconds.";
-			ConsoleHelper.WriteLine(LogType.Info, $"Successfully scraped {rowsScraped} rows. Time taken: {timeTaken}.");
-			return returnDict;
+			var timeTaken = $"{stopwatch.Elapsed.Minutes} Minutes, {stopwatch.Elapsed.Seconds} Seconds";
+			ConsoleHelper.WriteLine(LogType.Info, $"Scraped {totalScraped} rows. Time taken: {timeTaken}.");
 		}
 	}
 }
